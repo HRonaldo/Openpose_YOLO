@@ -46,8 +46,7 @@ def detect(save_img=False):
     # 加载Float32模型，确保用户设定的输入图片分辨率能整除32（如果不能则调整为能整除并删除）
     #model = attempt_load(weights, map_location=device)  # load FP32 model
 
-    model=YOLO.Predictor(weights,device,opt.classes,opt.conf_thres) #!!!
-    # model = torch.hub.load('ultralytics/yolov5', 'yolov5x', pretrained=True, channels=3, classes=80)
+    model=YOLO.Predictor(weights,device,opt.classes,opt.conf_thres)
     imgsz = check_img_size(imgsz, s=32)  # !!!check img_size
     # 设置Float16
     if half:
@@ -94,36 +93,9 @@ def detect(save_img=False):
 
         # Inference
         t1 = time_synchronized()
-        """
-               前向传播 返回pred的shape是(1, num_boxes, 5+num_class)
-               h,w为传入网络图片的长和宽，注意dataset在检测时使用了矩形推理，所以这里h不一定等于w
-               num_boxes = h/32 * w/32 + h/16 * w/16 + h/8 * w/8
-               pred[..., 0:4]为预测框坐标
-               预测框坐标为xywh(中心点+宽长)格式
-               pred[..., 4]为objectness置信度
-               pred[..., 5:-1]为分类结果
-               """
-        #pred = model(img, augment=opt.augment)[0]
 
-        # Apply NMS
-        """
-               pred:前向传播的输出
-               conf_thres:置信度阈值
-               iou_thres:iou阈值
-               classes:是否只保留特定的类别
-               agnostic:进行nms是否也去除不同类别之间的框
-               经过nms之后，预测框格式：xywh-->xyxy(左上角右下角)
-               pred是一个列表list[torch.tensor]，长度为batch_size
-               每一个torch.tensor的shape为(num_boxes, 6),内容为box+conf+cls
-               """
-        #pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres,classes=opt.classes, agnostic=opt.agnostic_nms)
         pred=model.predict(source=img)
         t2 = time_synchronized()
-
-        # Apply Classifier
-        # 添加二次分类，默认不适用
-        # if classify:
-        #     pred = apply_classifier(pred, modelc, img, im0s)
 
         # Process detections
         # 对每一张图片作处理
@@ -203,9 +175,9 @@ def detect(save_img=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # 选用训练的权重，可用根目录下的yolov5s.pt，也可用runs/train/exp/weights/best.pt
-    parser.add_argument('--weights', type=str, default='models/yolov5s.pt', help='model.pt path(s)')
+    parser.add_argument('--weights', type=str, default='models/hub/yolov8s.pt', help='model.pt path(s)')
     # 检测数据，可以是图片/视频路径，也可以是'0'(电脑自带摄像头),也可以是rtsp等视频流
-    parser.add_argument('--source', type=str, default='D:\\OneDrive\\桌面\\Openpose\\data\\pics',
+    parser.add_argument('--source', type=str, default='0',
                         help='source')  # file/folder, 0 for webcam
     # 网络输入图片大小
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
@@ -222,7 +194,7 @@ if __name__ == '__main__':
     # 是否将检测的labels以txt文件形式保存，默认False
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
     # 设置只保留某一部分类别，如0或者0 2 3
-    parser.add_argument('--classes', nargs='+', default=0, type=int,
+    parser.add_argument('--classes', nargs='+', default=[0,67], type=int,
                         help='filter by class: --class 0, or --class 0 2 3')
     # 进行nms是否也去除不同类别之间的框，默认False
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
@@ -238,6 +210,5 @@ if __name__ == '__main__':
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     opt = parser.parse_args()
     print(opt)
-
     with torch.no_grad():
         detect()

@@ -115,7 +115,7 @@ def infer_fast(net, img, net_input_height_size, stride, upsample_ratio, cpu,
 def run_demo(net, action_net, image_provider, height_size, cpu, boxList):
     net = net.eval()
     if not torch.cuda.is_available():
-        cpu=False
+        cpu=True
     if not cpu:
         net = net.cuda()
 
@@ -126,8 +126,6 @@ def run_demo(net, action_net, image_provider, height_size, cpu, boxList):
     i = 0
     for img in image_provider:  # 遍历图像集
         orig_img = img.copy()  # copy 一份
-        # print(i)
-        fallFlag = 0
         if i % 1 == 0:
             heatmaps, pafs, scale, pad = infer_fast(net, img, height_size, stride, upsample_ratio,
                                                     cpu)  # 返回热图,paf,输入模型图象相比原始图像缩放倍数,输入模型图像padding尺寸
@@ -178,7 +176,6 @@ def run_demo(net, action_net, image_provider, height_size, cpu, boxList):
 
             img = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
             cv2.imshow('Lightweight Human Pose Estimation Python Demo', img)
-
             cv2.waitKey(1)
         i += 1
 
