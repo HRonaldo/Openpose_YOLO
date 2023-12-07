@@ -170,7 +170,6 @@ def run_demo(net, action_net, image_provider, height_size, cpu, boxList):
                                   (pose.bbox[0] + pose.bbox[2], pose.bbox[1] + pose.bbox[3]), (0, 0, 255), thickness=3)
                     cv2.putText(img, 'state: {}'.format(pose.pose_action), (pose.bbox[0], pose.bbox[1] - 16),
                                 cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255))
-                    fallFlag = 1
                 else:
                     cv2.rectangle(img, (pose.bbox[0], pose.bbox[1]),
                                   (pose.bbox[0] + pose.bbox[2], pose.bbox[1] + pose.bbox[3]), (0, 255, 0))
