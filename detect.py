@@ -18,9 +18,10 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 import runOpenpose
 
+import YOLO
+
 
 def detect(save_img=False):
-    torch.cuda.is_available()
     global ip
     source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
@@ -31,23 +32,26 @@ def detect(save_img=False):
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     # 加载摔倒检测的模型
-    print("加载玩手机检测的模型开始")
-    net = jit.load(r'.\action_detect\checkPoint\openpose.jit')
-    action_net = torch.load(r'.\action_detect\checkPoint\action.pth')
-    print("加载玩手机检测的模型结束")
+    print("加载摔倒检测的模型开始")
+    net = jit.load(r'action_detect/checkPoint/openpose.jit')
+    action_net = jit.load(r'action_detect/checkPoint/action.jit')
+    print("加载摔倒检测的模型结束")
     # Initialize
     set_logging()
     # 获取设备
     device = select_device(opt.device)
     # 如果设备为gpu，使用Float16
-    half = device.type != 'gpu'  # half precision only supported on CUDA
+    half = device.type != 'cpu'  # half precision only supported on CUDA
     # Load model
     # 加载Float32模型，确保用户设定的输入图片分辨率能整除32（如果不能则调整为能整除并删除）
-    model = attempt_load(weights, map_location=device)  # load FP32 model
-    imgsz = check_img_size(imgsz, s=model.stride.max())  # check img_size
+    #model = attempt_load(weights, map_location=device)  # load FP32 model
+
+    model=YOLO.Predictor(weights,device,opt.classes,opt.conf_thres) #!!!
+    # model = torch.hub.load('ultralytics/yolov5', 'yolov5x', pretrained=True, channels=3, classes=80)
+    imgsz = check_img_size(imgsz, s=32)  # !!!check img_size
     # 设置Float16
     if half:
-        model.half()  # to FP16
+        model.model.half()  # to FP16
 
     # Set Dataloader
     # 通过不同的输入源来设置不同的数据加载方式
@@ -64,7 +68,7 @@ def detect(save_img=False):
 
     # Get names and colors
     # 获取类别的名字
-    names = model.module.names if hasattr(model, 'module') else model.names
+    names = model.module.names if hasattr(model, 'module') else model.model.names
     # 设置画框的颜色
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
 
@@ -72,7 +76,7 @@ def detect(save_img=False):
     t0 = time.time()
     # 进行一次向前推理，测试程序是否正常
     img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
-    _ = model(img.half() if half else img) if device.type != 'gpu' else None  # run once
+    _ = model.model(img.half() if half else img) if device.type != 'cpu' else None  # run once
     """
         path 图片/视频路径
         img 进行resize+pad之后的图片
@@ -99,7 +103,7 @@ def detect(save_img=False):
                pred[..., 4]为objectness置信度
                pred[..., 5:-1]为分类结果
                """
-        pred = model(img, augment=opt.augment)[0]
+        #pred = model(img, augment=opt.augment)[0]
 
         # Apply NMS
         """
@@ -112,7 +116,8 @@ def detect(save_img=False):
                pred是一个列表list[torch.tensor]，长度为batch_size
                每一个torch.tensor的shape为(num_boxes, 6),内容为box+conf+cls
                """
-        pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
+        #pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres,classes=opt.classes, agnostic=opt.agnostic_nms)
+        pred=model.predict(source=img)
         t2 = time_synchronized()
 
         # Apply Classifier
@@ -166,16 +171,7 @@ def detect(save_img=False):
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)
                         boxList.append([int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])])
 
-            print(boxList)
-            for box in boxList:
-                c1, c2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
-                x = c2[0] - c1[0]
-                y = c2[1] - c1[1]
-                #c if x / y >= 0.8:  # 比例>0.8 可能会是摔倒
-                print('进行人体姿态检测')
-                runOpenpose.run_demo(net, action_net, [im0], 256, True, boxList)  # 人体姿态检测 将图片和yolov5检测人体的框也传给openpose
-                break
-
+                runOpenpose.run_demo(net, action_net, [im0], 256, False, boxList)  # 人体姿态检测 将图片和yolov5检测人体的框也传给openpose
             # Print time (inference + NMS)
             # 打印向前传播+nms时间
             print(f'{s}Done. ({t2 - t1:.3f}s)')
@@ -200,6 +196,8 @@ def detect(save_img=False):
 
     # 打印总时间
     print(f'Done. ({time.time() - t0:.3f}s)')
+    cv2.destroyAllWindows()
+
 
 
 if __name__ == '__main__':

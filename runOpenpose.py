@@ -114,6 +114,8 @@ def infer_fast(net, img, net_input_height_size, stride, upsample_ratio, cpu,
 
 def run_demo(net, action_net, image_provider, height_size, cpu, boxList):
     net = net.eval()
+    if not torch.cuda.is_available():
+        cpu=False
     if not cpu:
         net = net.cuda()
 
@@ -179,62 +181,4 @@ def run_demo(net, action_net, image_provider, height_size, cpu, boxList):
 
             cv2.waitKey(1)
         i += 1
-    cv2.destroyAllWindows()
 
-
-
-
-def detect_main(video_name=''):
-    parser = argparse.ArgumentParser(
-        description='''Lightweight human pose estimation python demo.
-                           This is just for quick results preview.
-                           Please, consider c++ demo for the best performance.''')
-    parser.add_argument('--checkpoint-path', type=str, default='openpose.jit',
-                        help='path to the checkpoint')
-    parser.add_argument('--height-size', type=int, default=256, help='network input layer height size')
-    parser.add_argument('--video', type=str, default='1.mp4', help='path to video file or camera id')
-    parser.add_argument('--images', nargs='+',
-                        default='',
-                        help='path to input image(s)')
-    parser.add_argument('--cpu', action='store_true', help='run network inference on cpu')
-    parser.add_argument('--device', default='gpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-
-    parser.add_argument('--code_name', type=str, default='None', help='the name of video')
-    # parser.add_argument('--track', type=int, default=0, help='track pose id in video')
-    # parser.add_argument('--smooth', type=int, default=1, help='smooth pose keypoints')
-    args = parser.parse_args()
-
-    if video_name != '':
-        args.code_name = video_name
-
-    if args.video == '' and args.images == '':
-        raise ValueError('Either --video or --image has to be provided')
-
-    net = jit.load(r'.\action_detect\checkPoint\openpose.jit')
-
-    # *************************************************************************
-    action_net = torch.load(r'.\action_detect\checkPoint\action.pth')
-    # ************************************************************************
-
-    if args.video != '':
-        frame_provider = VideoReader(args.video, args.code_name)
-    else:
-        images_dir = []
-        if os.path.isdir(args.images):
-            for img_dir in os.listdir(args.images):
-                images_dir.append(os.path.join(args.images, img_dir))
-            frame_provider = ImageReader(images_dir)
-        else:
-            img = cv2.imread(args.images, cv2.IMREAD_COLOR)
-            frame_provider = [img]
-
-        # *************************************************************************
-
-        # args.track = 0
-    # camera = VideoReader('rtsp://admin:a1234567@10.34.131.154/cam/realmonitor?channel=1&subtype=0',args.code_name)
-
-    run_demo(net, action_net, frame_provider, args.height_size, True, [])
-
-
-if __name__ == '__main__':
-    detect_main()
